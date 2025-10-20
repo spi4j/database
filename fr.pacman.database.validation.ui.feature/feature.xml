@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feature
+      id="fr.pacman.database.validation.ui.feature"
+      label="PacMan Database - Validation"
+      version="1.0.0.qualifier"
+      plugin="fr.pacman.database.branding">
+
+   <requires>
+      <import plugin="org.eclipse.core.runtime"/>
+      <import plugin="org.eclipse.core.resources"/>
+      <import plugin="org.eclipse.emf.ecore"/>
+      <import plugin="org.eclipse.emf.ecore.xmi"/>
+      <import plugin="org.eclipse.ocl.ecore"/>
+      <import plugin="org.eclipse.acceleo.model"/>
+      <import plugin="org.eclipse.acceleo.engine"/>
+      <import plugin="org.obeonetwork.dsl.overview"/>
+      <import plugin="org.obeonetwork.dsl.database"/>
+      <import plugin="org.eclipse.acceleo.query.ide"/>
+      <import plugin="org.eclipse.ui"/>
+      <import plugin="org.eclipse.ocl"/>
+   </requires>
+
+   <plugin
+         id="fr.pacman.database.validation"
+         download-size="0"
+         install-size="0"
+         version="0.0.0"
+         unpack="false"/>
+
+   <plugin
+         id="fr.pacman.database.validation.ui"
+         download-size="0"
+         install-size="0"
+         version="0.0.0"
+         unpack="false"/>
+
+   <plugin
+         id="fr.pacman.database.branding"
+         download-size="0"
+         install-size="0"
+         version="0.0.0"
+         unpack="false"/>
+
+</feature>

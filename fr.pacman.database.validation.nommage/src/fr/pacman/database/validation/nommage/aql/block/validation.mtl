@@ -1,0 +1,187 @@
+[module validation(	'http://www.obeonetwork.org/dsl/database/1.0',
+					'http://www.obeonetwork.org/dsl/environment/3.0.0', 
+					'http://www.obeonetwork.org/dsl/typeslibrary/1.0')/]
+
+
+[import fr::pacman::database::validation::aql::core::report/]	
+[import fr::pacman::database::validation::core::PacmanValidatorsReport/]
+
+[comment écriture du rapport de validation pour un fichier de modélisation (entity)./]
+[template public validationNommage (database : database::DataBase)]
+  [comment on lance en premier la validation isd commune./]
+  [comment database.validation()/]
+  [comment on ajoute les contrôles spécifiques nommage./]
+  
+  [for (sc | database.eAllContents(database::Schema))]
+    [for (t | sc.eAllContents(database::Table))]
+      [comment RG_01 - Le nom des tables commence par "nomSchéma_"./]
+      [if (t.name <> null and not t.name.trim().matches('(?i)(^' + sc.name  +'_).*$'))]   
+        [t.add(t.RG_01(sc))/]
+      [/if]
+      [comment les colonnes "XDMAJ" et "XTOPSUP" commencent par "nomSchema_"./]
+      [for (c | t.columns)]
+        [if (c.name <> null and c.name.trim().matches('(?i)(.*(XDMAJ|XTOPSUP)).*') 
+           and not c.name.trim().matches('^' + sc.name  +'_.*$'))]
+          [c.add(c.RG_02_B(sc))/]
+       [/if] 
+      [/for]
+    [/for]
+   [/for]
+  
+   [comment gestion de toutes les tables (schéma ou pas schéma)./]
+   [for (t | database.eAllContents(database::Table))]
+     [for (c | t.columns)]
+       [comment RG_02 - Le nom des colonnes commence par "nomTable_"./]
+       [if (c.name <> null and c.name.trim().matches('(?i)(?!.*(XDMAJ|XTOPSUP)).*') 
+           and not c.inForeignKey and not c.name.trim().matches('^' + t.name  +'_.*$'))]
+         [c.add(c.RG_02_A(t))/]
+       [/if]
+     [/for]
+     
+     [comment RG_03 - Le nom de la colonne PK de la table se nomme "nomTable_ID"./]
+     [if (t.primaryKey <> null and t.primaryKey.columns->size() = 1 
+       and not t.primaryKey.columns->first().name.trim().equalsIgnoreCase(t.name  +'_ID'))]
+       [t.add(t.primaryKey.columns->first().RG_03(t))/]
+     [/if]
+     
+     [comment RG_04 - Le nom de la contrainte de PK de la table se nomme "nomTable_PK"./]
+     [if (t.primaryKey <> null and not t.primaryKey.name.equalsIgnoreCase(t.name + '_PK') )]
+       [t.add(t.primaryKey.RG_04(t))/]
+     [/if]
+     
+     [comment RG_05 - Le nom des FK est de la forme "nomTable _FKx_y"/]
+     [if (t.foreignKeys <> null and not t.foreignKeys->isEmpty())]
+       [for (f | t.foreignKeys)]
+         [let x = f.elements->size()]
+           [if (f.name <> null and not f.name.trim().matches('(?i)(^' + t.name  +'_FK' + x +'_[0-9]).*$'))]
+             [t.add(f.RG_05(t))/]
+           [/if]
+         [/let]
+       [/for]
+     [/if]
+     
+     [comment RG_06 - Le nom des INDEX est de la forme "nomTable"_[UN/IDX]x_y ./]
+     [for (i | t.indexes)]
+       [let x = i.elements->size()]
+         [if (i.unique)]
+           [if (i.name <> null and not i.name.trim().matches('(?i)(^' + t.name  +'_UN' + x + '_[0-9]).*$'))]
+             [t.add(i.RG_06_A(t))/]
+           [/if]
+         [else]
+           [if (i.name <> null and not i.name.trim().matches('(?i)(^' + t.name  +'_IDX' + x + '_[0-9]).*$'))]
+             [t.add(i.RG_06_B(t))/]
+           [/if]
+         [/if]
+       [/let]
+     [/for]
+        
+     [comment RG_07 - Le nom des CONTRAINTES (CHECK) est de la forme "nomTable"_CKx_y ./]
+     [for (c | t.constraints)]
+       [if (c.name <> null and not c.name.trim().matches('(?i)(^' + t.name  +'_CK[0-9]_[0-9]).*$'))] 
+         [t.add(c.RG_07(t))/]
+       [/if]
+     [/for]
+   [/for]
+   
+   [comment RG_08 - Le nom des SEQUENCE est de la forme "nomTable"_SEQ dans le cas ou la SEQUENCE 
+            est raccroché à la PK de la TABLE sinon elle se termine par _SEQ. Pour l'instant une 
+            seule colonne pour la séquence./]
+   [let ts = database.eAllContents(database::Table)]
+     [for (s | database.eAllContents(database::Sequence))]
+       [if (not s.columns->isEmpty() and s.columns->first().inPrimaryKey)]
+         [let t = ts->select(tbl | tbl.primaryKey <> null 
+           and not tbl.primaryKey.columns->isEmpty() 
+           and tbl.primaryKey.columns.name->exists(o | o.equalsIgnoreCase(s.columns->first().name)))]
+           [if (t <> null and s.name <> null and and not s.name.trim().equalsIgnoreCase(t.name + '_SEQ'))]
+             [s.add(s.RG_08_A(t->first()))/]
+           [/if]
+         [/let]
+       [else]
+         [if (s.name <> null and not s.name.trim().endsWith('_SEQ'))]
+           [s.add(s.RG_08_B())/]
+         [/if]
+       [/if]
+     [/for]
+   [/let]
+[/template]
+
+[comment ********************************************************************************************************************************** /]
+[comment **************************************************** MESSAGES ******************************************************************** /]
+[comment ********************************************************************************************************************************** /]
+
+[comment RG_01 - Le nom des tables commence par "nomSchéma_"./]
+[query private RG_01 (o : database::NamedElement, sc : database::NamedElement) : String = 
+    'RG_01@' 
+    + o.writeElementName()
+	+ '@Table non valide' 
+ 	+ '@Le nom de la table doit etre ' + sc.name + '_' + o.name/]
+ 
+[comment RG_02 - Le nom des colonnes commence par "nomTable_"; sauf pour les colonnes "XDMAJ" et "XTOPSUP" qui commencent par "nomSchema_"./]
+[query private RG_02_A (o : database::NamedElement, t : database::NamedElement) : String = 
+    'RG_02@' 
+    + o.writeElementName()
+	+ '@Colonne non valide' 
+ 	+ '@Le nom de la colonne doit etre ' + t.name + '_' + o.name/]
+ 	
+[comment RG_02 - Le nom des colonnes commence par "nomTable_"; sauf pour les colonnes "XDMAJ" et "XTOPSUP" qui commencent par "nomSchema_"./]
+[query private RG_02_B (o : database::NamedElement, sc : database::NamedElement) : String = 
+    'RG_02@' 
+    + o.writeElementName()
+	+ '@Colonne non valide' 
+ 	+ '@Le nom de la colonne doit etre ' + sc.name + '_' + o.name/]
+ 	
+[comment RG_03 - Le nom de la colonne PK de la table se nomme "nomTable_ID"./]
+[query private RG_03 (o : database::NamedElement, t : database::NamedElement) : String = 
+    'RG_03@' 
+    + o.writeElementName()
+	+ '@Clé primaire non valide' 
+ 	+ '@Le nom de la clé primaire doit être "' + t.name.trim() + '_ID"'/]
+ 	
+[comment RG_04 - Le nom de la contrainte de PK de la table se nomme "nomTable_PK"./]
+[query private RG_04 (o : database::NamedElement, t : database::NamedElement) : String = 
+    'RG_04@' 
+    + o.writeElementName()
+	+ '@Contrainte de clé primaire non valide' 
+ 	+ '@Le nom de la contrainte doit être "' + t.name.trim() + '_PK"'/]
+[comment RG_05 - Le nom des FK est de la forme "nomTable _FKx_y"/]
+[query private RG_05 (o : database::NamedElement, t : database::NamedElement) : String = 
+    'RG_05@' 
+    + o.writeElementName()
+	+ '@Clé étrangère non valide' 
+ 	+ '@le nom de la clé doit être de type "' + t.name.trim() + '_FKx_y"'/]
+ 	
+[comment RG_06 - Le nom des INDEX est de la forme "nomTable"_[UN/IDX]x_y ./]
+[query private RG_06_A (o : database::NamedElement, t : database::NamedElement) : String = 
+    'RG_06@' 
+    + o.writeElementName()
+	+ '@Index non valide' 
+ 	+ '@le nom de l\'index doit être de type "' + t.name.trim() + '_UNx_y"'/]
+ 	
+[comment RG_06 - Le nom des INDEX est de la forme "nomTable"_[UN/IDX]x_y ./]
+[query private RG_06_B (o : database::NamedElement, t : database::NamedElement) : String = 
+    'RG_06@' 
+    + o.writeElementName()
+	+ '@Index non valide' 
+ 	+ '@le nom de l\'index doit être de type "' + t.name.trim() + '_IDXx_y"'/]
+ 	
+[comment RG_07 - Le nom des CONTRAINTES (CHECK) est de la forme "nomTable"_CKx_y ./]
+[query private RG_07 (o : database::NamedElement, t : database::NamedElement) : String = 
+    'RG_07@' 
+    + o.writeElementName()
+	+ '@Constraint check non valide' 
+ 	+ '@le nom de la contraine doit être de type "' + t.name.trim() + '_CKx_y"'/]
+ 	
+[comment RG_08 - Le nom des SEQUENCE est de la forme "nomTable"_SEQ dans le cas ou la SEQUENCE est raccroché à la PK de la TABLE sinon elle se termine par _SEQ./]
+[query private RG_08_A(o : database::NamedElement, t : database::NamedElement) : String = 
+    'RG_08@' 
+    + o.writeElementName()
+	+ '@Séquence non valide' 
+ 	+ '@le nom de la séquence doit être de type "' + t.name.trim() + '_SEQ"'/]
+ 	
+[comment RG_08 - Le nom des SEQUENCE est de la forme "nomTable"_SEQ dans le cas ou la SEQUENCE est raccroché à la PK de la TABLE sinon elle se termine par _SEQ./]
+[query private RG_08_B(o : database::NamedElement) : String = 
+    'RG_08@' 
+    + o.writeElementName()
+	+ '@Séquence non valide' 
+ 	+ '@le nom de la séquence doit être de type "' + o.name.trim() + '_SEQ"'/]
+ 	

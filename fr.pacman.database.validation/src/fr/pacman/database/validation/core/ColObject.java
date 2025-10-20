@@ -1,0 +1,67 @@
+/*******************************************************************************
+ * Copyright (c) 2008, 2025 Obeo.
+ * All rights reserved. This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License v2.0
+ * which accompanies this distribution, and is available at
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * Contributors:
+ *     Obeo - initial API and implementation
+ *******************************************************************************/
+package fr.pacman.database.validation.core;
+
+public class ColObject {
+
+	private String name;
+	private String table;
+	private String alias;
+
+	ColObject(String name, String table, String alias) {
+		this.name = name;
+		this.table = table;
+		this.alias = alias;
+	}
+
+	ColObject(String name, String table) {
+		this.name = name;
+		this.table = table;
+		this.alias = "";
+	}
+
+	ColObject(String name) {
+		this.name = name;
+		this.table = "";
+		this.alias = "";
+	}
+
+	/**
+	 * Get name of the column.
+	 * 
+	 * @return name
+	 */
+	public String getName() {
+		return name;
+	}
+
+	/**
+	 * Get table of the column.
+	 * 
+	 * @return table name
+	 */
+	public String getTable() {
+		return table;
+	}
+
+	/**
+	 * Get alias of the column.
+	 * 
+	 * @return alias
+	 */
+	public String getAlias() {
+		return alias;
+	}
+
+	public void setTable(String table) {
+		this.table = table;
+	}
+}

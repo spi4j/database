@@ -1,0 +1,27 @@
+Manifest-Version: 1.0
+Automatic-Module-Name: fr.pacman.database.validation
+Bundle-ManifestVersion: 2
+Bundle-Name: Pacman Database - Validation
+Bundle-SymbolicName: fr.pacman.database.validation
+Bundle-Version: 1.0.0.qualifier
+Bundle-Activator: fr.pacman.database.validation.plugin.Activator
+Bundle-Vendor: Cali
+Require-Bundle: org.eclipse.core.runtime,
+ org.eclipse.emf.ecore,
+ org.eclipse.core.resources,
+ org.eclipse.sirius,
+ org.obeonetwork.dsl.environment,
+ org.obeonetwork.dsl.database,
+ org.obeonetwork.dsl.typeslibrary,
+ org.apache.commons.io,
+ org.eclipse.acceleo.query,
+ org.eclipse.acceleo.query.ide,
+ org.eclipse.acceleo.aql
+Bundle-ClassPath: .,lib/jsqlparser.jar
+Bundle-RequiredExecutionEnvironment: JavaSE-17
+Bundle-ActivationPolicy: lazy
+Export-Package: fr.pacman.database.validation.core,
+ fr.pacman.database.validation.aql.block,
+ fr.pacman.database.validation.aql.core,
+ fr.pacman.database.validation.main
+

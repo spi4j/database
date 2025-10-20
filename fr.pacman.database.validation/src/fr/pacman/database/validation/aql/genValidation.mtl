@@ -1,0 +1,10 @@
+[module genValidation(	'http://www.obeonetwork.org/dsl/database/1.0',
+						'http://www.obeonetwork.org/dsl/environment/3.0.0')/]
+
+[import fr::pacman::database::validation::aql::block::validation/]
+
+[comment @main/]	
+[comment écriture d'un fichier de validation pour la modélisation./]					
+[template public genValidation(database : database::DataBase)]
+  [database.validation()/]
+[/template]

@@ -1,0 +1,752 @@
+[module validation(	'http://www.obeonetwork.org/dsl/database/1.0',
+						'http://www.obeonetwork.org/dsl/environment/3.0.0', 
+						'http://www.obeonetwork.org/dsl/typeslibrary/1.0')/]
+
+[import fr::pacman::database::validation::core::ViewUtils/]
+[import fr::pacman::database::validation::core::KeywordUtils/]
+[import fr::pacman::database::validation::core::ConstraintUtils/]
+[import fr::pacman::database::validation::core::StringUtils/]
+[import fr::pacman::database::validation::core::TypeUtils/]
+[import fr::pacman::database::validation::core::PacmanValidatorsReport/]
+[import fr::pacman::database::validation::aql::core::report/]
+
+[comment écriture du rapport de validation pour un fichier de modélisation (entity)./]
+[template public validation (database : database::DataBase)]
+  [comment récupération du nom de la base de données./]
+  [let db = database.usedLibraries->filter(typeslibrary::NativeTypesLibrary)->first().name]
+  [comment récupération des types disponibles pour la base de données./]
+  [let dbTypes = database.usedLibraries->filter(typeslibrary::NativeTypesLibrary).nativeTypes]
+
+  [comment contrôles sur l'ensemble des éléments du modèle./]
+  [for (o | database.eAllContents(database::NamedElement))]
+    [comment pas de caractères accentués ou  de caratères spéciaux (sauf le caractère "_")./]
+    [if (o.name <> null and o.name.size() > 0 and not o.name.trim().matches('^[A-Za-z0-9_]+$'))]   
+      [o.add(o.RG_01_02())/]
+    [/if]
+    [comment pas de mot clé (selon le type de base)./]
+    [if (o.name <> null and o.name.size() > 0 and o.name.is_reservedKeyword(db))]
+      [o.add(o.RG_3())/]
+    [/if]
+  [/for]
+  
+  [comment le commentaire ne doit pas être vide./]
+  [if (database.comments = null or database.comments.trim().size() = 0)]
+    [database.add(database.RG_6_00())/]
+  [/if]
+  
+  [comment controle sur les schémas, chaque nom de schéma doit être unique./]
+  [let ss = database.eAllContents(database::Schema)]
+    [if (not (ss.name->asSet()->size() = ss->size()))]
+      [for (s | ss)]
+        [if (ss->select(o| o.name = s.name)->size() > 1)]
+          [s.add(s.RG_2_00())/]
+        [/if]
+      [/for]
+    [/if]
+  [/let]
+  
+  [comment contrôles sur les vues (queries)./]
+  [for (v | database.eAllContents(database::View))]
+    [comment la query ne peux pas être vide./] 	
+    [if (v.query = null or v.query.trim().size() = 0)]
+      [v.add(v.RG_3_01())/]
+    [/if]
+    
+    [comment le commentaire ne doit pas être vide./]
+    [if (v.comments = null or v.comments.trim().size() = 0)]
+      [v.add(v.RG_6_00())/]
+    [/if]
+    
+    [comment les tables de la query doivent appartenir au(x) modèle(s)./] 
+    [comment pour l'instant on tente avec case insensitive./]	
+    [let tns = v.get_parsedTableNames()]
+    [let ts = database.eAllContents(database::Table)
+    	->select(o | tns
+    	->collect(o2 | o2.toLower())
+    	->includes(o.name.toLower()))]
+      
+      [comment on refait la boucle pour être plus précis mais 
+               a voir si on ne fait pas tns.size() <> ts.size()./]
+      [for (tn | tns)]
+        [if (not database.eAllContents(database::Table)
+          ->exists(o | o.name.toLower() = tn.toLower()))]
+          [v.add(v.RG_3_02())/]
+        [/if]
+      [/for]
+    
+      [comment les colonnes de la query doivent appartenir au(x) table(s)./] 	
+      [if (v.is_requestParsed() and not v.has_validColumns(ts))]
+        [v.add(v.RG_3_03())/]
+      [/if]
+    [/let]
+    [/let]
+ 
+    [comment la query doit être syntaxiquement correcte./]
+    [if (not v.is_requestParsed())]
+       [v.add(v.RG_3_04())/]
+    [/if]
+    
+    [comment la query doit avoir un nom renseigné./]
+    [if (v.name = null or v.name.trim().size() = 0)]
+      [v.add(v.RG_3_05())/]
+    [/if]
+  [/for]
+  [comment le nom des vues doit etre unique./]
+  [let vs = database.eAllContents(database::View)]
+    [if (not (vs.name->asSet()->size() = vs->size()))]
+      [for (v | vs)]
+        [if (vs->select(o| o.name = v.name)->size() > 1)]
+          [v.add(v.RG_3_00())/]
+        [/if]
+      [/for]
+    [/if]
+  [/let]
+  
+  [comment le nom des tables doit etre unique (pour chaque schéma)./]
+  [for (s | database.eAllContents(database::Schema))]
+    [let ts = s.eAllContents(database::Table)]
+      [if (not (s.eAllContents(database::Table).name->asSet()
+        ->size() = s.eAllContents(database::Table)->size()))]
+        [for (t | ts)]
+          [if (ts->select(o| o.name = t.name)->size() > 1)]
+            [t.add(t.RG_4_00_B())/]
+          [/if]
+        [/for]
+      [/if]
+    [/let]
+  [/for]
+  
+  [comment le nom des tables doit etre unique au niveau database./]
+  [let ts = database.tables]
+    [if (not (ts.name->asSet()->size() = ts->size()))]
+      [for (t | ts)]
+        [if (ts->select(o| o.name = t.name)->size() > 1)]
+          [t.add(t.RG_4_00_A())/]
+        [/if]
+      [/for]
+    [/if]
+  [/let]
+
+  [comment contrôles sur les tables./]
+  [for (t | database.eAllContents(database::Table))]
+    [comment doit contenir au moins 1 colonne./]
+    [if (t.columns->isEmpty())]
+      [t.add(t.RG_4_01())/]
+    [/if]
+    
+    [comment le commentaire ne doit pas être vide./]
+    [if (t.comments  = null or t.comments.trim().size() = 0)]
+      [t.add(t.RG_6_00())/]
+    [/if]
+    
+    [comment doit contenir une et une seule PK./]
+    [if (t.primaryKey = null)]
+      [t.add(t.RG_4_02())/]
+	[/if]
+	
+	[comment le commentaire ne doit pas être vide./]
+	[if (t.primaryKey <> null and (t.primaryKey.comments = null 
+	  or t.primaryKey.comments.trim().size() = 0))]
+	  [t.add(t.primaryKey.RG_6_00())/]
+	[/if]
+	
+	[comment les colonnes de la PK doivent appartenir à la table./]
+	[if (not t.columns->isEmpty() and t.primaryKey <> null 
+		and not t.columns->includesAll(t.primaryKey.columns))]
+   	  [t.add(t.RG_4_03())/]
+	[/if]
+
+    [comment une PK doit contenir au moins 1 colonne./]
+	[if (t.primaryKey <> null and t.primaryKey.columns->isEmpty())]
+	  [t.add(t.RG_42_01())/]
+	[/if]
+	
+	[comment une PK doit avoir un nom de renseigné./]
+	[if (t.primaryKey <> null and (t.primaryKey.name = null or t.primaryKey.name.trim().size() = 0))]
+     [t.add(t.RG_42_02())/]
+    [/if]
+	
+	[comment le nom de la table est obligatoire./]
+	[if (t.name = null or t.name.trim().size() = 0)]
+      [t.add(t.RG_4_04())/]
+    [/if]
+    
+    [comment controle sur les colonnes, chaque colonne doit être unique./]
+    [if (not (t.columns.name->asSet()->size() = t.columns->size()))]
+      [comment t.add(t.RG_2_00())/]
+    [/if]
+
+    [comment controles sur les colonnes./]
+    [for (c | t.columns)]
+      [comment une colonne doit avoir un type (faisant partie des types de la BDD)./]
+      [if (dbTypes <> null and not dbTypes->isEmpty() and not dbTypes
+        ->includes(c.type.oclAsType(typeslibrary::TypeInstance).nativeType))]     
+        [c.add(c.RG_41_01())/]
+      [/if]
+      
+      [comment la colonne doit etre commentée./]
+      [if (c.comments = null or c.comments.trim().size() = 0)]
+        [c.add(c.RG_6_00())/]
+      [/if]
+      
+      [comment une colonne cochée 'In Primary Key' doit appartenir aux colonnes contenues dans la PK./]
+      [if (c.inPrimaryKey and not t.primaryKey.columns->includes(c))]
+        [c.add(c.RG_41_02())/]
+      [/if]
+      
+      [comment une colonne cochée 'AutoIncremente' ne doit pas faire référence à une séquence./]
+      [if (c.autoincrement and database.eAllContents(database::Sequence).columns->includes(c))]
+        [c.add(c.RG_41_03())/]
+      [/if]
+      
+      [comment une colonne référençant une séquence ne doit pas être cochée 'AutoIncremente'./]
+      [if (c.sequence <> null and c.autoincrement)]
+        [c.add(c.RG_41_04())/]
+      [/if]
+      
+      [comment une colonne cochée 'Unique' doit appartenir à un index unique./]
+      [if (c.unique and not c.indexes->select(o | o.unique)
+      	->collect(o1 | o1.elements.column)->includes(c))]
+        [c.add(c.RG_41_05())/]
+      [/if]
+      
+      [comment le nom de la colonne doit être renseigné./]
+      [if (c.name = null or c.name.trim().size() = 0)]
+        [c.add(c.RG_41_06())/]
+      [/if]
+      
+      [comment une colonne doit avoir un nom unique dans la table./]
+      [if (t.columns->select(o | o.name = c.name)->size() > 1)]
+        [c.add(c.RG_41_00())/]
+      [/if]
+      
+      [comment si la colonne a un type avec une taille, elle doit être renseignée./]
+      [if (c.type <> null and c.type.oclAsType(typeslibrary::TypeInstance).nativeType <> null 
+         and not c.type.oclAsType(typeslibrary::TypeInstance).is_lengthNotNull(db))]
+         [c.add(c.RG_46_01())/]
+      [/if]
+      
+      [comment si un type possède une taille la valeur de lenght doit être différent de 0./]
+      [if (c.type <> null and c.type.oclAsType(typeslibrary::TypeInstance).nativeType <> null 
+         and not c.type.oclAsType(typeslibrary::TypeInstance).is_lengthNotZero(db))]
+         [c.add(c.RG_46_02())/]
+      [/if]
+    [/for]
+    
+    [comment contrôles sur les clés étrangères./]
+    [for (f | t.foreignKeys)]
+      [comment le nom doit être unique au sein de la table./]
+      [if (t.foreignKeys->select(o | o.name = f.name)->size() > 1)]
+        [f.add(f.RG_43_00())/]
+      [/if]
+      
+      [comment le commentaire ne doit pas être vide./]
+      [if (f.comments  = null or f.comments.trim().size() = 0)]
+        [f.add(f.RG_6_00())/]
+      [/if]
+      
+      [comment doit faire référence à au moins 1 table (Target)./]
+      [if (f.getTargetTable() = null or f.getTargetTable()->isEmpty())]
+        [f.add(f.RG_43_01())/]
+      [/if]
+      
+      [comment doit contenir au moins 1 élément (un couple PK/FK)./]
+      [if (f.elements = null or f.elements->isEmpty())]
+        [f.add(f.RG_43_02())/]
+      [/if]
+      
+      [comment doit contenir une référence FK (une colonne de la table) et une PK (une colonne PK de la table Target)./]
+      [if (not f.elements->select(o | o.fkColumn = null or o.pkColumn = null)->isEmpty())]
+      	 [f.add(f.RG_43_03())/]
+      [/if]
+      
+      [comment les colonnes (PK et FK) de l'élément doivent être de même type./]
+      [if (f.elements <> null and not f.elements->isEmpty() 
+       and f.elements->first().fkColumn <> null 
+       and f.elements->first().pkColumn <> null 
+       and f.elements->first().fkColumn.type <> null
+       and f.elements->first().pkColumn.type <> null 
+       and not f.elements->first().fkColumn.type.oclAsType(typeslibrary::TypeInstance).nativeType.name
+       .equalsIgnoreCase(f.elements->first().pkColumn.type.oclAsType(typeslibrary::TypeInstance).nativeType.name))]
+        [f.add(f.RG_43_04())/]
+      [/if]
+
+	  [comment le nom de la clé étrangère doit être renseigné./]
+      [if (f.name = null or f.name.trim().size() = 0)]
+        [f.add(f.RG_43_05())/]
+	  [/if]
+    [/for]
+    
+    [comment contrôles sur les indexs./]
+    [for (i | t.indexes)]
+      [comment le nom doit être unique au niveau de la table./]
+      [if (t.indexes->select(o | o.name = i.name)->size() > 1)]
+        [i.add(i.RG_44_00())/]
+      [/if]
+      
+      [comment un index doit contenir 1 colonne./]
+      [if (i.elements->isEmpty() or i.elements->first().column = null)]
+        [i.add(i.RG_44_01())/]
+      [/if]
+      
+      [comment le commentaire ne doit pas être vide./]
+      [if (i.comments  = null or i.comments.trim().size() = 0)]
+        [i.add(i.RG_6_00())/]
+      [/if]
+      
+      [comment toutes les colonnes qui composent l'index doivent appartenir à la table./]
+      [if (not t.columns->includesAll(i.elements->collect(o | o.column)))] 
+        [i.add(i.RG_44_02())/]
+      [/if]
+      
+      [comment un index unique n'a pas de colonne 'Nullable'./]
+      [if (i.unique and not i.elements->select(o | o.column.nullable)->isEmpty())]
+        [i.add(i.RG_44_03())/]
+      [/if]
+      
+      [comment le nom de l'index doit etre renseigné./]
+      [if (i.name = null or i.name.trim().size() = 0)]
+        [i.add(i.RG_44_04())/]
+      [/if]
+    [/for]
+    
+    [comment controle sur les contraintes./]
+    [for (c | t.constraints)]
+      [comment le nom doit etre unique au niveau de la table./]
+      [if (t.constraints->select(o | o.name = c.name)->size() > 1)]
+        [c.add(c.RG_45_00())/]
+      [/if]
+      
+      [comment pour une contrainte l'expression ne peut pas être vide./]
+      [if (c.expression = null or c.expression.trim().size() = 0)]
+        [c.add(c.RG_45_01())/]
+      [/if]
+      
+      [comment le commentaire ne doit pas être vide./]
+      [if (c.comments  = null or c.comments.trim().size() = 0)]
+        [c.add(c.RG_6_00())/]
+      [/if]
+     	
+      [comment si il y a des colonnes, elles doivent appartenir à la table./]
+      [if (c.expression <> null and c.expression.trim().size() > 0 
+        and not c.has_validColumns(t))]
+        [c.add(c.RG_45_02())/]
+      [/if]
+
+      [comment le nom doit être renseigné./]
+      [if (c.name = null or c.name.trim().size() = 0)]
+        [c.add(c.RG_45_03())/]
+      [/if]
+     
+    [/for]
+  [/for]
+
+  [comment le nom des séquences doit être unique au niveau de chaque schéma./]
+  [for (s | database.eAllContents(database::Schema))]
+     [let ss = s.sequences]
+       [if (not (ss.name->asSet()->size() = ss->size()))]
+         [for (se | ss)]
+           [if (ss->select(o| o.name = se.name)->size() > 1)]
+             [s.add(se.RG_5_00_B())/]
+           [/if]
+         [/for]
+       [/if]
+    [/let]
+  [/for]
+  
+  [comment le nom des séquences doit être unique au niveau database./]
+  [let ss = database.sequences]
+    [if (not (ss.name->asSet()->size() = ss->size()))]
+      [for (s | ss)]
+        [if (ss->select(o| o.name = s.name)->size() > 1)]
+          [s.add(s.RG_5_00_A())/]
+        [/if]
+      [/for]
+    [/if]
+  [/let]
+
+  [comment contrôle sur les séquences./]
+  [for (s | database.eAllContents(database::Sequence))]
+    [comment le nom des séquences doit être unique au niveau database et au niveau de chaque schéma./]
+    [comment s.add(s.RG_5_00())/]
+    
+    [comment si saisi, alors uniquement un nombre dans Start,Increment,Min Value,Max Value,Cache Size./]
+    [if (s.maxValue <> null 
+      and not s.maxValue.oclIsKindOf(ecore::EBigInteger))]
+      [s.add(s.RG_5_01())/]
+    [/if]
+    
+    [if (s.minValue <> null 
+      and not s.minValue.oclIsKindOf(ecore::EBigInteger))]
+      [s.add(s.RG_5_01())/]
+    [/if]
+    
+    [if (s.increment <> null 
+      and not s.increment.oclIsKindOf(ecore::EBigInteger))]
+      [s.add(s.RG_5_01())/]
+    [/if]
+    
+    [if (s.cacheSize <> null 
+      and not s.cacheSize.oclIsKindOf(ecore::EBigInteger))]
+      [s.add(s.RG_5_01())/]
+    [/if]
+    
+    [if (s.start <> null 
+      and not s.start.oclIsKindOf(ecore::EBigInteger))]
+      [s.add(s.RG_5_01())/]
+    [/if]
+   
+    [comment la valeur dans le champ 'Max Value' doit être supérieure à celle du champ 'Min Value' si elle est saisie./]
+    [if ((s.maxValue <> null and s.minValue <> null) 
+      and s.maxValue.oclIsKindOf(ecore::EBigInteger) 
+      and s.minValue.oclIsKindOf(ecore::EBigInteger)
+      and s.minValue > s.maxValue)]
+      [s.add(s.RG_5_02())/]
+    [/if]
+    
+    [comment le commentaire ne doit pas être vide./]
+    [if (s.comments  = null or s.comments.trim().size() = 0)]
+    [s.add(s.RG_6_00())/]
+    [/if]
+    
+    [comment le nom ne doit pas être vide./]
+    [if (s.name = null or s.name.trim().size() = 0)]
+      [s.add(s.RG_5_03())/]
+    [/if]
+  [/for]
+  [/let]
+  [/let]
+[/template]
+
+[comment ********************************************************************************************************************************** /]
+[comment **************************************************** MESSAGES ******************************************************************** /]
+[comment ********************************************************************************************************************************** /]
+
+[comment pas de caractères accentués, pas de caratères spéciaux (sauf le caractères "_")./]
+[query private RG_01_02 (o : database::NamedElement) : String = 
+    'RG_01 / RG_02@' 
+    + o.writeElementName()
+	+ '@Caractère(s) non valide(s)' 
+ 	+ '@Pas d\'espaces, de caractères accentués ou spéciaux (sauf "_")'/]
+ 	
+[comment le nom des schémas doit être unique./]
+[query private RG_3 (o : database::NamedElement) : String = 
+	'RG_3@' 
+	+ o.writeElementName()
+ 	+ '@Problème de nommage' 
+ 	+ '@Mot réservé pour la base de données : + o.name'/]
+
+[comment le nom des schémas doit être unique./]
+[query private RG_2_00 (o : database::NamedElement) : String = 
+	'RG_2_00@' 
+	+ o.writeElementName() + 
+ 	+ '@Problème de schéma' 
+ 	+ '@Le nom de chaque schéma doit etre unique pour la database'/]
+
+[comment le nom des vues doit etre unique./]
+[query private RG_3_00 (o : database::NamedElement) : String = 
+	'RG_3_00@' 
+	+ o.writeElementName()
+ 	+ '@Problème de vue' 
+ 	+ '@Le nom de chaque vue doit etre unique.'/]
+ 	
+[comment le nom des tables doit etre unique au sein d'un schéma./]
+[query private RG_4_00_B (o : database::NamedElement) : String = 
+	'RG_4_00_B@' 
+	+ o.writeElementName()
+ 	+ '@Problème de table' 
+ 	+ '@Le nom de chaque table doit etre unique dans un schéma'/]
+ 	
+[comment le nom des tables doit etre unique au sein de la base./]
+[query private RG_4_00_A (o : database::NamedElement) : String = 
+	'RG_4_00_A@' 
+	+ o.writeElementName()
+ 	+ '@Problème de table' 
+ 	+ '@Le nom de chaque table doit etre unique dans la base'/]
+ 	
+[comment la query ne peux pas être vide./] 	
+[query private RG_3_01 (o : database::NamedElement) : String = 
+	'RG_3_01@' 
+	+ o.writeElementName()
+ 	+ '@Problème de requête' 
+ 	+ '@La requête doit etre renseignée.'/]
+ 	
+[comment les tables de la query doivent appartenir aux modèles./] 	
+[query private RG_3_02 (o : database::NamedElement) : String = 
+	'RG_3_02@' 
+	+ o.writeElementName()
+ 	+ '@Problème de requête'  
+ 	+ '@Les tables doivent appartenir aux modèles'/]
+ 	
+[comment les colonnes doivent appartenir aux tables qui figurent dans la query./] 	
+[query private RG_3_03 (o : database::NamedElement) : String = 
+	'RG_3_03@' 
+	+ o.writeElementName()
+ 	+ '@Problème de requête'  
+ 	+ '@Les colonnes doivent appartenir aux tables de la requête'/]
+ 	
+[comment la query doit être syntaxiquement correcte./] 	
+[query private RG_3_04 (o : database::NamedElement) : String = 
+	'RG_3_04@' 
+	+ o.writeElementName()
+ 	+ '@Problème de requête' 
+ 	+ '@La requête n\'est pas correcte'/]		
+ 	
+[comment vue doit avoir un nom de renseigné./] 	
+[query private RG_3_05 (o : database::NamedElement) : String =  
+	'RG_3_05@' 
+	+ o.writeElementName()
+ 	+ '@Problème de vue' 
+ 	+ '@Le nom de la vue doit être renseigné'/]	
+
+[comment la table doit obligatoirement contenir au moins 1 colonne./] 	
+[query private RG_4_01 (o : database::NamedElement) : String = 
+	'RG_4_01@'
+    + o.writeElementName()
+ 	+ '@Problème de table' 
+ 	+ '@Une table doit contenir au moins une colonne'/]
+
+[comment la table doit obligatoirement contenir une clé primaire./] 	
+[query private RG_4_02 (o : database::NamedElement) : String = 
+	'RG_4_02@' 
+	+ o.writeElementName()
+ 	+ '@Problème de clé primaire' 
+ 	+ '@Une table doit contenir une clé primaire'/]
+ 	 	
+[comment Les colonnes de la PK doivent obligatoirement appartenir à la table./]	 	
+[query private RG_4_03 (o : database::NamedElement) : String = 
+	'RG_4_03@' 
+	+ o.writeElementName()
+ 	+ '@Problème de clé primaire' 
+ 	+ '@La colonne de la clé primaire doit appartenir à la table'/] 	 	
+ 	
+[comment Le nom de la table est obligatoire./]	 	
+[query private RG_4_04 (o : database::NamedElement) : String = 
+   'RG_4_04@'
+	+ o.writeElementName()
+ 	+ '@Problème de table' 
+ 	+ '@Le nom de la table doit être renseigné'/] 	
+ 	
+[comment Une colonne doit avoir un nom unique au sein de la table./]
+[query private RG_41_00 (o : database::NamedElement) : String = 
+	'RG_41_00@'
+	+ o.writeElementName()
+ 	+ '@Problème de colonne' 
+ 	+ '@La colonne doit avoir un nom unique dans la table'/] 	
+ 	 	
+[comment Une colonne doit obligatoirement avoir un type faisant partie des types de la BDD./]
+[query private RG_41_01 (o : database::NamedElement) : String = 
+	'RG_41_01@'
+	+ o.writeElementName()
+ 	+ '@Problème de colonne' 
+ 	+ '@La colonne doit avoir un type valide'/] 	 
+ 	
+[comment Une colonne cochée 'In Primary Key' doit appartenir aux colonnes contenues dans la PK./]
+[query private RG_41_02 (o : database::NamedElement) : String = 
+	'RG_41_02@'
+	+ o.writeElementName()
+ 	+ '@Problème de colonne' 
+ 	+ '@Une colonne \'In Primary Key\' doit être contenue dans la PK'/]  	
+ 	
+[comment Une colonne cochée 'AutoIncremente' ne doit pas faire référence à une séquence./]
+[query private RG_41_03 (o : database::NamedElement) : String = 
+	'RG_41_03@'
+	+ o.writeElementName()
+ 	+ '@Problème de colonne' 
+ 	+ '@Une colonne \'AutoIncremente\' ne doit pas référencer une séquence'/] 		 	
+ 	 	
+[comment une colonne faisant référence à une séquence ne doit pas être cochée 'AutoIncremente'./]
+[query private RG_41_04 (o : database::NamedElement) : String = 
+	'RG_41_04@'
+	+ o.writeElementName()
+ 	+ '@Problème de colonne' 
+ 	+ '@Une colonne \'AutoIncremente\' ne doit pas référencer une séquence'/] 	 	 	
+ 	 	
+[comment une colonne \'unique\' doit appartenir à un index unique./]
+[query private RG_41_05 (o : database::NamedElement) : String = 
+	'RG_41_05@'
+	+ o.writeElementName()
+ 	+ '@Problème de colonne' 
+ 	+ '@Une colonne\'Unique\' doit appartenir à un index unique'/] 	 	 
+ 	
+[comment le nom de la colonne doit être renseigné./]
+[query private RG_41_06 (o : database::NamedElement) : String = 
+	'RG_41_06@'
+	+ o.writeElementName()
+ 	+ '@Problème de colonne' 
+ 	+ '@Le nom de la colonne doit etre renseigné'/] 		
+ 	
+[comment une clé primaire doit obligatoirement contenir au moins une colonne./]
+[query private RG_42_01 (o : database::NamedElement) : String =  
+	'RG_42_01@'
+	+ o.writeElementName()
+ 	+ '@Problème de clé primaire' 
+ 	+ '@Une clé primaire doit contenir au moins une colonne'/] 	  	
+ 	
+[comment une clé primaire doit obligatoirement avoir un nom de renseigné./]
+[query private RG_42_02 (o : database::NamedElement) : String =  
+	'RG_42_02@'
+	+ o.writeElementName()
+ 	+ '@Problème de clé primaire' 
+ 	+ '@Le nom de la clé primaire doit être renseigné'/] 
+ 	
+ [comment le nom des clé étrangères doit être unique au niveau d'une table./]
+ [query private RG_43_00 (o : database::NamedElement) : String = 
+ 	'RG_43_00@'
+ 	+ o.writeElementName()
+  	+ '@Problème de clé étrangère' 
+  	+ '@Le nom doit etre unique au niveau de la table'/] 	
+
+[comment une clé étrangère doit obligatoirement faire référence à une table./]
+[query private RG_43_01 (o : database::NamedElement) : String = 
+	'RG_43_01@'
+	+ o.writeElementName()
+ 	+ '@Problème de clé étrangère' 
+ 	+ '@Une clé étrangère doit faire référence à une table'/] 	
+ 	
+[comment une clé étrangère doit obligatoirement contenir un élément (couple FK/PK)./]
+[query private RG_43_02 (o : database::NamedElement) : String = 
+	'RG_43_02@'
+	+ o.writeElementName()
+ 	+ '@Problème de clé étrangère' 
+ 	+ '@Une clé étrangère doit contenir au moins 1 un couple PK/FK'/] 	 	
+ 	
+[comment une clé étrangère doit obligatoirement contenir un élément (couple FK/PK)./]
+[query private RG_43_03 (o : database::NamedElement) : String = 
+	'RG_43_03@'
+	+ o.writeElementName()
+ 	+ '@Problème de clé étrangère' 
+ 	+ '@Un élément doit contenir une référence FK et une PK'/] 	 	 	
+
+[comment les colonnes (PK et FK) de l'élément doivent être de même type pour une clé étangère ./]
+[query private RG_43_04 (o : database::NamedElement) : String = 
+	'RG_43_04@'
+	+ o.writeElementName()
+ 	+ '@Problème de clé étrangère' 
+ 	+ '@Les colonnes (PK et FK) de l\'élément doivent être de même type'/]  
+ 	
+[comment le nom de la clé étrangère doit être renseigné ./]
+[query private RG_43_05 (o : database::NamedElement) : String = 
+	'RG_43_05@'
+	+ o.writeElementName()
+ 	+ '@Problème de clé étrangère' 
+ 	+ '@Le nom de la clé étrangère doit être renseigné'/]  	
+ 	
+[comment le nom de l'index doit être unique au nveau de la table./]
+[query private RG_44_00 (o : database::NamedElement) : String = 
+	'RG_44_00@'
+	+ o.writeElementName()
+ 	+ '@Problème d\'index' 
+ 	+ '@Le nom de l\'index doit être unique au niveau de la table'/] 
+ 		
+[comment un index doit contenir 1 colonne./]
+[query private RG_44_01 (o : database::NamedElement) : String = 
+	'RG_44_01@'
+	+ o.writeElementName()
+ 	+ '@Problème d\'index' 
+ 	+ '@Un index doit obligatoirement contenir une colonne'/] 
+ 	
+[comment toutes les colonnes qui composent l'index doivent appartenir à la table./]
+[query private RG_44_02 (o : database::NamedElement) : String = 
+	'RG_44_02@'
+	+ o.writeElementName()
+ 	+ '@Problème d\'index' 
+ 	+ '@Les colonnes qui composent l\'index doivent toutes appartenir à la table'/] 
+ 	
+[comment un index unique n'a pas de colonne 'Nullable'./]
+[query private RG_44_03 (o : database::NamedElement) : String = 
+	'RG_44_03@'
+	+ o.writeElementName()
+ 	+ '@Problème d\'index' 
+ 	+ '@Un index unique ne peux pas avoir de colonne \'Nullable\''/] 
+ 	
+[comment le nom de l'index doit être renseigné./]
+[query private RG_44_04 (o : database::NamedElement) : String = 
+	'RG_44_04@'
+	+ o.writeElementName()
+ 	+ '@Problème d\'index' 
+ 	+ '@Le nom de l\'index doit être renseigné.'/] 
+ 	
+ [comment le nom de la contrainte doit être unique au niveau de la table./]
+ [query private RG_45_00 (o : database::NamedElement) : String = 
+ 	'RG_45_00@'
+ 	+ o.writeElementName()
+  	+ '@Problème de contrainte' 
+  	+ '@Le nom de la contrainte doit être unique pour la table'/] 
+ 	
+[comment pour une contrainte l'expression ne peut pas être vide./]
+[query private RG_45_01 (o : database::NamedElement) : String = 
+	'RG_45_01@'
+	+ o.writeElementName()
+ 	+ '@Problème de contrainte' 
+ 	+ '@La contrainte doit avoir une expression renseignée'/] 
+ 	
+[comment pour une contrainte, si il y a des colonnes, elles doivent appartenir à la table./]
+[query private RG_45_02 (o : database::NamedElement) : String = 
+	'RG_45_02@'
+	+ o.writeElementName()
+ 	+ '@Problème de contrainte' 
+ 	+ '@Les colonnes de l\'expression doivent appartenir à la table'/] 
+ 	
+[comment le nom de la contrainte doit être renseigné./]
+[query private RG_45_03 (o : database::NamedElement) : String = 
+	'RG_45_03@'
+	+ o.writeElementName()
+ 	+ '@Problème de contrainte' 
+ 	+ '@Le nom de la contrainte doit être renseigné'/] 
+ 	
+[comment la taille pour le type doit être renseignée./]
+[query private RG_46_01 (o : database::NamedElement) : String = 
+	'RG_46_01@'
+	+ o.writeElementName()
+ 	+ '@Problème de type' 
+ 	+ '@La taille pour le type doit être renseignée'/] 
+ 	
+[comment si un type possède une taille la valleur de lenght doit être différent de 0./]
+[query private RG_46_02 (o : database::NamedElement) : String = 
+	'RG_46_02@'
+	+ o.writeElementName()
+ 	+ '@Problème de type' 
+ 	+ '@La taille pour le type doit être différente de 0'/] 
+ 	
+[comment le nom des séquences doit être unique au niveau database./]
+[query private RG_5_00_A (o : database::NamedElement) : String = 
+	'RG_5_00_A@'
+	+ o.writeElementName()
+ 	+ '@Problème de séquence' 
+ 	+ '@Le nom de la séquence doit être unique pour la database'/] 
+ 	
+[comment le nom des séquences doit être unique au niveau de chaque schéma./]
+[query private RG_5_00_B (o : database::NamedElement) : String = 
+	'RG_5_00_B@'
+	+ o.writeElementName()
+ 	+ '@Problème de séquence' 
+ 	+ '@Le nom de la séquence doit être unique pour chaque schéma'/]
+ 	
+[comment séquence : si saisie, alors uniquement un nombre dans Start,Increment,Min Value,Max Value,Cache Size./]
+[query private RG_5_01 (o : database::NamedElement) : String = 
+	'RG_5_01@'
+	+ o.writeElementName()
+ 	+ '@Problème de séquence' 
+ 	+ '@La saisie doit obligatoirement être un nombre.'/] 
+ 	
+[comment  séquence : la valeur saisie dans le champ 'Max Value' doit être SUPERIEURE à celle du champ 'Min Value' si elle est saisie./]
+[query private RG_5_02 (o : database::NamedElement) : String = 
+	'RG_5_02@'
+	+ o.writeElementName()
+ 	+ '@Problème de séquence' 
+ 	+ '@La saisie est incorrecte dans \'Max Value\' et/ou \'Min Value\''/] 
+ 	
+[comment le nom de la séquence ne doit pas être vide./]
+[query private RG_5_03 (o : database::NamedElement) : String = 
+	'RG_5_03@'
+	+ o.writeElementName()
+ 	+ '@Problème de séquence' 
+ 	+ '@Le nom de la séquence doit être renseigné'/] 
+ 	
+[comment le commentaire ne doit pas être vide./]
+[query private RG_6_00 (o : database::NamedElement) : String = 
+	'RG_6_00@'
+	+ o.writeElementName()
+ 	+ '@Problème de commentaire' 
+ 	+ '@Le commentaire doit être renseigné'/] 

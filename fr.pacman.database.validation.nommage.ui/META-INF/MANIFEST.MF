@@ -1,0 +1,21 @@
+Manifest-Version: 1.0
+Automatic-Module-Name: fr.pacman.database.validation.nommage.ui
+Bundle-ManifestVersion: 2
+Bundle-Name: Pacman - Database Validation Nommage - UI
+Bundle-SymbolicName: fr.pacman.database.validation.nommage.ui;singleton:=true
+Bundle-Version: 1.0.0.qualifier
+Bundle-Activator: fr.pacman.database.validation.nommage.ui.plugin.Activator$Implementation
+Bundle-Vendor: Cali
+Require-Bundle: org.eclipse.emf.ecore,
+ org.eclipse.core.runtime,
+ org.eclipse.core.resources,
+ org.eclipse.ui,
+ org.eclipse.jdt.core,
+ org.eclipse.jdt.ui,
+ org.eclipse.jface.text,
+ fr.pacman.database.validation.nommage,
+ fr.pacman.database.validation.ui;visibility:=reexport,
+ org.eclipse.acceleo.aql,
+ org.eclipse.acceleo.query
+Bundle-RequiredExecutionEnvironment: JavaSE-17
+Bundle-ActivationPolicy: lazy

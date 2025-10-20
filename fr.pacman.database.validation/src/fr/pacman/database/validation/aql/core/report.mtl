@@ -1,0 +1,28 @@
+[module report('http://www.obeonetwork.org/dsl/database/1.0')/]
+
+[import fr::pacman::database::validation::core::ViewUtils/]
+[import fr::pacman::database::validation::core::KeywordUtils/]
+[import fr::pacman::database::validation::core::ConstraintUtils/]
+[import fr::pacman::database::validation::core::StringUtils/]
+[import fr::pacman::database::validation::core::PacmanValidatorsReport/]
+
+[comment écriture pour le nom de l'élément./] 		
+[query public writeElementName(o : database::NamedElement) : String = 
+	if (o <> null) then if (o.eContainer() <> null and not o.eContainer().oclIsKindOf(database::DataBase) 
+	and o.eContainer().oclIsKindOf(database::NamedElement)) then o.eContainer().writeElementName() + '.' else '' endif 
+	+ if (o.name <> null and o.name.trim().size() > 0) then  o.name.sanitize() else o.toString().sanitize() endif 
+	else 'ERREUR !!!!!' endif/]
+
+[comment écriture d'une ligne pour un tableau (avec taille de la cellule et séparateur)./]
+[query private writeTabLine(s : String) : String =
+  let parts = s.tokenize('@') in
+    parts->at(1).ensureTabCell(20, '|') +
+    parts->at(2).ensureTabCell(70, '|') +
+    parts->at(3).ensureTabCell(40, '|') +
+    parts->at(4).ensureTabCell(70, '|')/]
+
+[comment retourne la ligne pour le tableau avec une taille et un séparateur./]
+[query public ensureTabCell(str : String, size : Integer, separator : String) : String = str.do_tabCell(size, separator)/]
+
+[comment on s'assure que la ligne ne va pas perturber le traitement du tokenizer./]
+[query public sanitize(s : String) : String = s.replace('\\[TRANSIENT\\]','').replaceAll('@','')/]
