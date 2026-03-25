@@ -260,20 +260,29 @@
       	 [f.add(f.RG_43_03())/]
       [/if]
       
-      [comment les colonnes (PK et FK) de l'élément doivent être de même type./]
-      [if (f.elements <> null and not f.elements->isEmpty() 
-       and f.elements->first().fkColumn <> null 
-       and f.elements->first().pkColumn <> null 
-       and f.elements->first().fkColumn.type <> null
-       and f.elements->first().pkColumn.type <> null 
-       and not f.elements->first().fkColumn.type.oclAsType(typeslibrary::TypeInstance).nativeType.name
-       .equalsIgnoreCase(f.elements->first().pkColumn.type.oclAsType(typeslibrary::TypeInstance).nativeType.name))]
+      [comment les colonnes (PK et FK) de l'élément doivent être de même type (ne s'occupe pas des serials)./]
+      [if (f.isValidFK() and not f.isTypeOfSerialFK() and not f.typeFK().equalsIgnoreCase(f.typePKFK()))]
         [f.add(f.RG_43_04())/]
       [/if]
 
 	  [comment le nom de la clé étrangère doit être renseigné./]
       [if (f.name = null or f.name.trim().size() = 0)]
         [f.add(f.RG_43_05())/]
+	  [/if]
+	  
+	  [comment les colonnes (PK et FK) de l'élément doivent être de même type (uniquement les serials)./]
+	  [if (f.isValidFK() and f.isSerialPKFK() and not f.typeFK().equalsIgnoreCase('INT4'))]
+	    [f.add(f.RG_43_06())/]
+	  [/if]
+	  
+	  [comment les colonnes (PK et FK) de l'élément doivent être de même type (uniquement les serials)./]
+	  [if (f.isValidFK() and  f.isSerialPKFKSmall() and not f.typeFK().equalsIgnoreCase('INT2'))]
+	    [f.add(f.RG_43_07())/]
+	  [/if]
+	  
+	  [comment les colonnes (PK et FK) de l'élément doivent être de même type (uniquement les serials)./]
+	  [if (f.isValidFK() and f.isSerialPKFKBig() and not f.typeFK().equalsIgnoreCase('INT8'))]
+	    [f.add(f.RG_43_08())/]
 	  [/if]
     [/for]
     
@@ -417,6 +426,33 @@
   [/let]
   [/let]
 [/template]
+
+[comment ********************************************************************************************************************************** /]
+[comment **************************************************** QUERIES ********************************************************************* /]
+[comment ********************************************************************************************************************************** /]
+
+[comment vérifie si la clé étrangère est correctement renseignée./]
+[query private isValidFK(f : database::ForeignKey) : Boolean = f.elements <> null and not f.elements->isEmpty() 
+   and f.elements->first().fkColumn <> null and f.elements->first().pkColumn <> null and f.elements->first().fkColumn.type <> null
+   and f.elements->first().pkColumn.type <> null /] 
+
+[comment vérifie si la clé étrangère est de type Serial de manière générale (Serial, BigSerial, SmallSerial)./]
+[query private isTypeOfSerialFK(f : database::ForeignKey) : Boolean = f.isSerialPKFK() or f.isSerialPKFKBig() or f.isSerialPKFKSmall()/]
+
+[comment vérifie si la clé étrangère est de type Serial./]
+[query private isSerialPKFK(f : database::ForeignKey) : Boolean = f.typePKFK().equalsIgnoreCase('SERIAL')/]
+
+[comment vérifie si la clé étrangère est de type smallSerial./]
+[query private isSerialPKFKBig(f : database::ForeignKey) : Boolean = f.typePKFK().equalsIgnoreCase('BIGSERIAL')/]
+
+[comment vérifie si la clé étrangère est de type bigSerial./]
+[query private isSerialPKFKSmall(f : database::ForeignKey) : Boolean = f.typePKFK().equalsIgnoreCase('SMALLSERIAL')/]
+
+[comment retourne le type de la clé étrangère./]   
+[query private typeFK(f : database::ForeignKey) : String = f.elements->first().fkColumn.type.oclAsType(typeslibrary::TypeInstance).nativeType.name/]
+
+[comment retourne le type de la clé primaire référencée par la clé étrangère./]     
+[query private typePKFK(f : database::ForeignKey) : String = f.elements->first().pkColumn.type.oclAsType(typeslibrary::TypeInstance).nativeType.name/]
 
 [comment ********************************************************************************************************************************** /]
 [comment **************************************************** MESSAGES ******************************************************************** /]
@@ -631,6 +667,27 @@
 	+ o.writeElementName()
  	+ '@Problème de clé étrangère' 
  	+ '@Le nom de la clé étrangère doit être renseigné'/]  	
+ 	
+[comment le nom de la clé étrangère doit être renseigné ./]
+[query private RG_43_06 (o : database::NamedElement) : String = 
+	'RG_43_06@'
+	+ o.writeElementName()
+ 	+ '@Problème de clé étrangère' 
+ 	+ '@La clé doit être de type INT4 pour le type SERIAL'/]  
+ 	
+[comment le nom de la clé étrangère doit être renseigné ./]
+[query private RG_43_07 (o : database::NamedElement) : String = 
+	'RG_43_07@'
+	+ o.writeElementName()
+ 	+ '@Problème de clé étrangère' 
+ 	+ '@La clé doit être de type INT2 pour le type SMALLSERIAL'/]  	
+ 	
+[comment le nom de la clé étrangère doit être renseigné ./]
+[query private RG_43_08 (o : database::NamedElement) : String = 
+	'RG_43_08@'
+	+ o.writeElementName()
+ 	+ '@Problème de clé étrangère' 
+ 	+ '@La clé doit être de type INT8 pour le type BIGSERIAL'/]  		
  	
 [comment le nom de l'index doit être unique au nveau de la table./]
 [query private RG_44_00 (o : database::NamedElement) : String = 
