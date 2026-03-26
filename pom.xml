@@ -83,6 +83,10 @@
 			<id>validation-nommage</id>
 			<modules>
 				<module>fr.pacman.database.branding</module>
+			    <module>fr.pacman.database.validation</module>
+		 		<module>fr.pacman.database.validation.ui</module>
+		 		<module>fr.pacman.database.validation.ui.feature</module>
+		 		<module>fr.pacman.database.validation.update</module>
 				<module>fr.pacman.database.validation.nommage</module>
 				<module>fr.pacman.database.validation.nommage.ui</module>
 				<module>fr.pacman.database.validation.nommage.ui.feature</module>
