@@ -9,7 +9,7 @@
 		<version>1.0.0</version>
 	</parent>
 	
-	<artifactId>fr.pacman.database.validation.update</artifactId>
+	<artifactId>fr.pacman.database.validation.nommage.update</artifactId>
 	<packaging>eclipse-repository</packaging>
 	<name>fr.pacman.database.validation.nommage.update</name>
 	<description>Update Site Pacman Validation Nommage Database.</description>
@@ -22,7 +22,8 @@
 				<version>${tycho-version}</version>
 				<configuration>
 					<createArtifactRepository>true</createArtifactRepository>
-					<finalName>${project.groupId}-nommage-${unqualifiedVersion}.${buildQualifier}</finalName>
+					<!-- Changement ici : finalName = artifactId-version -->
+					<finalName>${project.artifactId}-${project.version}</finalName>
 				</configuration>
 			</plugin>
 			 <plugin>
@@ -40,34 +41,47 @@
           			<outputDirectory>${project.build.directory}</outputDirectory>
         		</configuration>
       		</plugin>
-			<plugin>
-				<artifactId>maven-antrun-plugin</artifactId>
-				<executions>
-					<execution>
-						<id>Rename</id>
-						<phase>package</phase>
-						<goals>
-							<goal>run</goal>
-						</goals>
-						<configuration>
-							<target>
-								<!-- The category.xml file is not used by tycho for now... -->
-								<!-- Delete the other useless archive. -->
-								<!-- 
-								<delete>
-									<fileset dir="target/">
-										<include name ="*.properties"/>
-									</fileset>
-								</delete>
-								<delete dir="target/targetPlatformRepository" />		
-								<delete dir="target/repository" />						
-								<delete dir="target/antrun" />
-								-->
-							</target>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
+      		
+            <!-- Injection des sources dans le zip final -->
+            <plugin>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>add-sources-to-update-site</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <!-- Crée un répertoire temporaire -->
+                                <mkdir dir="${project.build.directory}/update-site-temp"/>
+
+                                <!-- Dézipper le zip Tycho généré -->
+                                <unzip src="${project.build.directory}/${project.build.finalName}.zip"
+                                       dest="${project.build.directory}/update-site-temp"/>
+
+                                <!-- Copier tous les bundles .source générés par les plugins -->
+                                <copy todir="${project.build.directory}/update-site-temp/plugins">
+                                    <fileset dir="../fr.pacman.database.validation.nommage/target" includes="*-sources.jar"/>
+                                    <fileset dir="../fr.pacman.database.validation.nommage.ui/target" includes="*-sources.jar"/>
+                                    <fileset dir="../fr.pacman.database.validation/target" includes="*-sources.jar"/>
+                                    <fileset dir="../fr.pacman.database.validation.ui/target" includes="*-sources.jar"/>
+                                    <fileset dir="../fr.pacman.database.branding/target" includes="*-sources.jar"/>
+                                </copy>
+
+                                <!-- Rezipper le update site final avec les sources -->
+                                <zip destfile="${project.build.directory}/${project.build.finalName}-with-sources.zip">
+                                    <fileset dir="${project.build.directory}/update-site-temp"/>
+                                </zip>
+
+                                <!-- Nettoyage du répertoire temporaire -->
+                                <delete dir="${project.build.directory}/update-site-temp"/>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
 		</plugins>
 	</build>
 </project>
