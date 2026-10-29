@@ -3,8 +3,8 @@ Automatic-Module-Name: fr.pacman.database.branding
 Bundle-ManifestVersion: 2
 Bundle-Name: Cali
 Bundle-SymbolicName: fr.pacman.database.branding;singleton:=true
-Bundle-Version: 1.0.0.qualifier
+Bundle-Version: 1.0.1.qualifier
 Require-Bundle: org.eclipse.osgi
 Bundle-Activator: fr.pacman.database.branding.Activator
 Bundle-Vendor: Cali
-Bundle-RequiredExecutionEnvironment: JavaSE-17
+Bundle-RequiredExecutionEnvironment: JavaSE-21

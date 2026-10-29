@@ -2,7 +2,7 @@
 <feature
       id="fr.pacman.database.validation.nommage.ui.feature"
       label="PacMan Database - Validation Nommage"
-      version="1.0.0.qualifier">
+      version="1.0.1.qualifier">
 
    <requires>
       <import plugin="org.eclipse.core.runtime"/>

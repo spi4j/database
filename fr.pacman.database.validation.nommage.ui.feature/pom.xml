@@ -7,7 +7,7 @@
 	<parent>
 		<groupId>fr.pacman.validation</groupId>
 		<artifactId>pacman-database-parent</artifactId>
-		<version>1.0.0</version>
+		<version>1.0.1</version>
 	</parent>
 
 	<artifactId>fr.pacman.database.validation.nommage.ui.feature</artifactId>
@@ -19,7 +19,7 @@
 		<dependency>
 			<groupId>fr.pacman.validation</groupId>
 			<artifactId>fr.pacman.database.validation.ui.feature</artifactId>
-			<version>1.0.0</version>
+			<version>1.0.1</version>
 			<type>eclipse-feature</type>
 		</dependency>
 	</dependencies>

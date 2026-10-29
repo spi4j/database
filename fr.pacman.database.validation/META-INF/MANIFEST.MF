@@ -3,7 +3,7 @@ Automatic-Module-Name: fr.pacman.database.validation
 Bundle-ManifestVersion: 2
 Bundle-Name: Pacman Database - Validation
 Bundle-SymbolicName: fr.pacman.database.validation
-Bundle-Version: 1.0.0.qualifier
+Bundle-Version: 1.0.1.qualifier
 Bundle-Activator: fr.pacman.database.validation.plugin.Activator
 Bundle-Vendor: Cali
 Require-Bundle: org.eclipse.core.runtime,
@@ -18,7 +18,7 @@ Require-Bundle: org.eclipse.core.runtime,
  org.eclipse.acceleo.query.ide,
  org.eclipse.acceleo.aql
 Bundle-ClassPath: .,lib/jsqlparser.jar
-Bundle-RequiredExecutionEnvironment: JavaSE-17
+Bundle-RequiredExecutionEnvironment: JavaSE-21
 Bundle-ActivationPolicy: lazy
 Export-Package: fr.pacman.database.validation.core,
  fr.pacman.database.validation.aql.block,

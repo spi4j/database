@@ -3,7 +3,7 @@ Automatic-Module-Name: fr.pacman.database.validation.ui
 Bundle-ManifestVersion: 2
 Bundle-Name: Pacman - Database Validation - UI
 Bundle-SymbolicName: fr.pacman.database.validation.ui;singleton:=true
-Bundle-Version: 1.0.0.qualifier
+Bundle-Version: 1.0.1.qualifier
 Bundle-Activator: fr.pacman.database.validation.ui.plugin.Activator$Implementation
 Bundle-Vendor: Cali
 Require-Bundle: org.eclipse.emf.ecore,
@@ -26,7 +26,7 @@ Require-Bundle: org.eclipse.emf.ecore,
  org.eclipse.gmf.runtime.draw2d.ui,
  org.eclipse.gmf.runtime.diagram.core,
  fr.pacman.database.validation
-Bundle-RequiredExecutionEnvironment: JavaSE-17
+Bundle-RequiredExecutionEnvironment: JavaSE-21
 Bundle-ActivationPolicy: lazy
 Export-Package: fr.pacman.database.validation.ui.core,
  fr.pacman.database.validation.ui.plugin

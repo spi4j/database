@@ -2,7 +2,7 @@
 <feature
       id="fr.pacman.database.validation.ui.feature"
       label="PacMan Database - Validation"
-      version="1.0.0.qualifier"
+      version="1.0.1.qualifier"
       plugin="fr.pacman.database.branding">
 
    <requires>
