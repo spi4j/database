@@ -470,7 +470,7 @@
 	'RG_3@' 
 	+ o.writeElementName()
  	+ '@Problème de nommage' 
- 	+ '@Mot réservé pour la base de données : + o.name'/]
+ 	+ '@Mot réservé pour la base de données : ' + o.name/]
 
 [comment le nom des schémas doit être unique./]
 [query private RG_2_00 (o : database::NamedElement) : String = 
